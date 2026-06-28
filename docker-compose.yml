@@ -1,0 +1,99 @@
+# HyperPlane — backend services
+# Week 2: FastAPI backend (built from ./backend) replaces the Week 1 placeholder.
+# Run with `docker compose up -d --build`.
+# All services share the `hyperplane-net` bridge network so they resolve each other by name.
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — primary store for incidents, agent traces, users, playbooks
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: hyperplane-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-hyperplane}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hyperplane_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-hyperplane}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hyperplane} -d ${POSTGRES_DB:-hyperplane}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hyperplane-net
+
+  # ---------------------------------------------------------------------------
+  # Elasticsearch — log + event search backend (single-node, security off)
+  # ---------------------------------------------------------------------------
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    container_name: hyperplane-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - hyperplane-net
+
+  # ---------------------------------------------------------------------------
+  # FastAPI backend — agent runtime + REST API for the React dashboard.
+  # Built from ./backend (Dockerfile). Entrypoint runs alembic upgrade head then
+  # starts uvicorn on :8000.
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: hyperplane-backend:dev
+    container_name: hyperplane-backend
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-hyperplane}:${POSTGRES_PASSWORD:-hyperplane_dev}@postgres:5432/${POSTGRES_DB:-hyperplane}
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+      - OLLAMA_HOST=http://host.docker.internal:11434
+      - LLM_PROVIDER=ollama
+      - LLM_MODEL=llama3.1:8b
+      - ENVIRONMENT=dev
+      - LOG_LEVEL=INFO
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - hyperplane-net
+
+# -----------------------------------------------------------------------------
+# Named volumes — persist data across `docker compose down`
+# -----------------------------------------------------------------------------
+volumes:
+  postgres_data:
+    name: hyperplane_postgres_data
+  es_data:
+    name: hyperplane_es_data
+
+# -----------------------------------------------------------------------------
+# Shared bridge network — services reach each other by service name
+# -----------------------------------------------------------------------------
+networks:
+  hyperplane-net:
+    name: hyperplane-net
+    driver: bridge
