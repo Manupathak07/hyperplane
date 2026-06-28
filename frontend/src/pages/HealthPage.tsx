@@ -4,6 +4,7 @@ import { Activity, Database, Server } from "lucide-react";
 import { api } from "@/lib/api";
 import SeverityBadge from "@/components/incidents/SeverityBadge";
 import DomainBadge from "@/components/incidents/DomainBadge";
+import { AccordionItem } from "@/components/ui/accordion";
 import { formatDateTime } from "@/lib/utils";
 
 export default function HealthPage() {
@@ -14,20 +15,49 @@ export default function HealthPage() {
   });
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Backend
-        </h2>
-        {isLoading && <StatusCard state="loading" />}
-        {isError && (
-          <StatusCard
-            state="error"
-            message={(error as Error).message}
-            onRetry={() => refetch()}
-          />
-        )}
-        {data && (
+    <div className="mx-auto max-w-4xl space-y-6">
+      {/* ── PRIMARY: status banner ───────────────────────────────────── */}
+      {isLoading && <Banner tone="muted">Checking backend…</Banner>}
+      {isError && (
+        <Banner tone="bad">
+          <div className="font-medium">Backend unreachable</div>
+          <div className="mt-1 text-xs opacity-80">{(error as Error).message}</div>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="mt-3 rounded-md border border-red-500/40 px-2 py-1 text-xs hover:bg-red-500/15"
+          >
+            Retry
+          </button>
+        </Banner>
+      )}
+      {data && (
+        <Banner tone={data.status === "ok" ? "ok" : "warn"}>
+          <div className="flex items-center gap-3">
+            <span className="relative flex h-3 w-3">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-400" />
+            </span>
+            <div>
+              <div className="text-sm font-semibold">
+                {data.status === "ok"
+                  ? "All systems operational"
+                  : "System degraded"}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {data.service} · {data.database === "up" ? "database connected" : "database down"}
+              </div>
+            </div>
+          </div>
+        </Banner>
+      )}
+
+      {/* ── SECONDARY: metric cards ─────────────────────────────────── */}
+      {data && (
+        <section>
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Backend metrics
+          </h2>
           <div className="grid gap-4 md:grid-cols-3">
             <MetricCard
               icon={Activity}
@@ -48,51 +78,63 @@ export default function HealthPage() {
               tone="neutral"
             />
           </div>
-        )}
-      </section>
+        </section>
+      )}
 
-      <section>
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Raw response
-        </h2>
-        <pre className="overflow-auto rounded-md border border-border bg-card p-4 text-xs leading-relaxed">
+      {/* ── DEBUG: collapsible raw response (least visual weight) ──── */}
+      <AccordionItem title="View raw response" defaultOpen={false}>
+        <pre className="overflow-auto rounded-md bg-background/50 p-3 text-xs leading-relaxed">
           {JSON.stringify(data ?? { loading: true }, null, 2)}
         </pre>
-      </section>
+      </AccordionItem>
 
+      {/* ── FOOTER: tertiary reference info ─────────────────────────── */}
       {data && data.status === "ok" && (
-        <section>
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            Quick reference
-          </h2>
-          <div className="grid gap-3 text-sm md:grid-cols-2">
-            <div className="rounded-md border border-border bg-card p-4">
-              <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                Next check
-              </div>
-              <div className="mt-1 font-mono">
+        <section className="rounded-md border border-border/60 bg-card/30 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+            <div>
+              Next auto-refresh:{" "}
+              <span className="font-mono text-foreground/80">
                 {formatDateTime(new Date(Date.now() + 15_000).toISOString())}
-              </div>
+              </span>
             </div>
-            <div className="rounded-md border border-border bg-card p-4">
-              <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                Severity legend
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <SeverityBadge value="low" />
-                <SeverityBadge value="medium" />
-                <SeverityBadge value="high" />
-                <SeverityBadge value="critical" />
-                <span className="mx-1 text-muted-foreground">·</span>
-                <DomainBadge value="IT" />
-                <DomainBadge value="OT" />
-                <DomainBadge value="IoT" />
-              </div>
+            <div className="flex items-center gap-2">
+              <span>Severity:</span>
+              <SeverityBadge value="low" />
+              <SeverityBadge value="medium" />
+              <SeverityBadge value="high" />
+              <SeverityBadge value="critical" />
+            </div>
+            <div className="flex items-center gap-2">
+              <span>Domain:</span>
+              <DomainBadge value="IT" />
+              <DomainBadge value="OT" />
+              <DomainBadge value="IoT" />
             </div>
           </div>
         </section>
       )}
     </div>
+  );
+}
+
+function Banner({
+  tone,
+  children,
+}: {
+  tone: "ok" | "warn" | "bad" | "muted";
+  children: React.ReactNode;
+}) {
+  const cls =
+    tone === "ok"
+      ? "border-emerald-500/40 bg-emerald-500/10"
+      : tone === "warn"
+        ? "border-amber-500/40 bg-amber-500/10"
+        : tone === "bad"
+          ? "border-red-500/40 bg-red-500/10"
+          : "border-border bg-card";
+  return (
+    <div className={`rounded-md border p-4 ${cls}`}>{children}</div>
   );
 }
 
@@ -126,39 +168,6 @@ function MetricCard({
       >
         {value}
       </div>
-    </div>
-  );
-}
-
-function StatusCard({
-  state,
-  message,
-  onRetry,
-}: {
-  state: "loading" | "error";
-  message?: string;
-  onRetry?: () => void;
-}) {
-  if (state === "loading") {
-    return (
-      <div className="rounded-md border border-border bg-card p-4 text-sm text-muted-foreground">
-        Checking backend…
-      </div>
-    );
-  }
-  return (
-    <div className="rounded-md border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
-      <div className="font-medium">Backend unreachable</div>
-      <div className="mt-1 text-xs text-red-300/80">{message}</div>
-      {onRetry && (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="mt-3 rounded-md border border-red-500/40 px-2 py-1 text-xs hover:bg-red-500/15"
-        >
-          Retry
-        </button>
-      )}
     </div>
   );
 }

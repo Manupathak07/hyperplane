@@ -7,14 +7,54 @@ import SeverityBadge from "@/components/incidents/SeverityBadge";
 import DomainBadge from "@/components/incidents/DomainBadge";
 import { formatDateTime, formatRelative } from "@/lib/utils";
 
+type Counts = {
+  total: number;
+  critical: number;
+  high: number;
+  new: number;
+};
+
 export default function IncidentsPage() {
   const { data, isLoading, isError, error, refetch, isRefetching } = useQuery({
     queryKey: ["incidents"],
     queryFn: () => api.listIncidents(50),
+    refetchInterval: 15_000,
   });
 
+  const counts: Counts = (data ?? []).reduce(
+    (acc, inc) => {
+      acc.total++;
+      if (inc.severity === "critical") acc.critical++;
+      if (inc.severity === "high") acc.high++;
+      if (inc.status === "new") acc.new++;
+      return acc;
+    },
+    { total: 0, critical: 0, high: 0, new: 0 },
+  );
+
   return (
-    <div className="mx-auto max-w-7xl space-y-4">
+    <div className="space-y-4">
+      {/* ── PRIMARY: stat row ─────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Stat label="Total" value={counts.total} tone="neutral" />
+        <Stat
+          label="Critical"
+          value={counts.critical}
+          tone={counts.critical > 0 ? "bad" : "muted"}
+        />
+        <Stat
+          label="High"
+          value={counts.high}
+          tone={counts.high > 0 ? "warn" : "muted"}
+        />
+        <Stat
+          label="New"
+          value={counts.new}
+          tone={counts.new > 0 ? "ok" : "muted"}
+        />
+      </div>
+
+      {/* ── SECONDARY: table card ─────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
           {data
@@ -117,6 +157,37 @@ export default function IncidentsPage() {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: "ok" | "warn" | "bad" | "muted" | "neutral";
+}) {
+  const toneClass =
+    tone === "ok"
+      ? "text-emerald-300"
+      : tone === "warn"
+        ? "text-amber-300"
+        : tone === "bad"
+          ? "text-red-300"
+          : tone === "neutral"
+            ? "text-foreground"
+            : "text-muted-foreground";
+  return (
+    <div className="rounded-md border border-border bg-card p-4">
+      <div className="text-xs uppercase tracking-wider text-muted-foreground">
+        {label}
+      </div>
+      <div className={`mt-1 text-2xl font-semibold tabular-nums ${toneClass}`}>
+        {value}
+      </div>
     </div>
   );
 }

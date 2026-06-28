@@ -1,6 +1,7 @@
 import { useLocation } from "react-router-dom";
 
 import HealthPill from "@/components/health/HealthPill";
+import LiveIndicator from "@/components/health/LiveIndicator";
 
 const TITLES: Record<string, { title: string; subtitle: string }> = {
   "/health": { title: "System Health", subtitle: "Backend, database, and agent pipeline status" },
@@ -22,6 +23,7 @@ export default function Header() {
         <p className="text-xs text-muted-foreground">{meta.subtitle}</p>
       </div>
       <div className="flex items-center gap-3">
+        <LiveIndicator />
         <HealthPill />
       </div>
     </header>
