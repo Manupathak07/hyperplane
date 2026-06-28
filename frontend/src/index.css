@@ -2,25 +2,63 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =============================================================================
+ * HyperPlane SIEM — Color System
+ *
+ *   Base:           #0B0F14
+ *   Surface:        #111826
+ *   Elevated:       #162033
+ *   Border:         #243042
+ *   Text primary:   #E6EDF3
+ *   Text secondary: #9AA7B2
+ *   Text muted:     #5B6B7A
+ *   Accent (blue):  #4DA3FF
+ *   Healthy:        #2EE59D
+ *   Warning:        #FFB020
+ *   Critical:       #FF4D4F  (real incidents ONLY)
+ *   Live/telemetry: #3BC7FF
+ *   Violet glow:    #6C5CE7  (5-8% opacity signature layer only)
+ *
+ * Rules:
+ *   - Dark-first, never pure black
+ *   - Red reserved for real incidents
+ *   - Cyan reserved for live data / system flow
+ *   - Blue is the only interactive accent
+ *   - Layered surfaces, not flat
+ * ============================================================================= */
+
 @layer base {
   :root {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
-    --card: 222 47% 14%;
-    --card-foreground: 210 40% 98%;
-    --primary: 188 95% 43%;
-    --primary-foreground: 222 47% 11%;
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 217 33% 20%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217 33% 22%;
-    --input: 217 33% 22%;
-    --ring: 188 95% 43%;
+    /* Surfaces — layered, not flat */
+    --background:           216 28% 6%;   /* #0B0F14 — base */
+    --foreground:           210 24% 90%;  /* #E6EDF3 — primary text */
+
+    --card:                 220 30% 11%;  /* #111826 — surface */
+    --card-foreground:      210 24% 90%;  /* #E6EDF3 */
+
+    --popover:              222 31% 13%;  /* #162033 — elevated */
+    --popover-foreground:   210 24% 90%;
+
+    --secondary:            222 31% 13%;  /* #162033 */
+    --secondary-foreground: 210 24% 90%;
+
+    --muted:                220 19% 16%;  /* slightly above card */
+    --muted-foreground:     212 14% 64%;  /* #9AA7B2 — secondary text */
+
+    --accent:               222 31% 18%;  /* hover surface */
+    --accent-foreground:    210 24% 90%;
+
+    --destructive:          0 100% 64%;   /* #FF4D4F — real incidents only */
+    --destructive-foreground: 210 24% 90%;
+
+    --border:               218 25% 20%;  /* #243042 */
+    --input:                218 25% 20%;
+    --ring:                 213 100% 65%; /* #4DA3FF — electric blue */
+
+    /* Single interactive accent */
+    --primary:              213 100% 65%; /* #4DA3FF */
+    --primary-foreground:   216 28% 6%;   /* dark text on blue */
+
     --radius: 0.5rem;
   }
 
@@ -35,13 +73,46 @@
   }
 }
 
-/* Severity chip colors */
+/* =============================================================================
+ * HyperPlane palette utilities
+ *
+ * These are the ONLY places outside status banners that should use each colour.
+ * Stick to the rules — no rogue reds on health pills, no rogue cyans on
+ * interactive elements.
+ * ============================================================================= */
 @layer utilities {
-  .sev-low       { @apply bg-emerald-500/15 text-emerald-300 border-emerald-500/30; }
-  .sev-medium    { @apply bg-amber-500/15  text-amber-300  border-amber-500/30; }
-  .sev-high      { @apply bg-orange-500/15 text-orange-300 border-orange-500/30; }
-  .sev-critical  { @apply bg-red-500/15    text-red-300    border-red-500/30; }
-  .dom-it        { @apply bg-cyan-500/15   text-cyan-300   border-cyan-500/30; }
-  .dom-ot        { @apply bg-violet-500/15 text-violet-300 border-violet-500/30; }
-  .dom-iot       { @apply bg-pink-500/15   text-pink-300   border-pink-500/30; }
+  /* Status — use only on real status displays */
+  .hp-healthy   { color: #2EE59D; }
+  .hp-healthy-bg { background-color: rgba(46, 229, 157, 0.12); border-color: rgba(46, 229, 157, 0.35); }
+
+  .hp-warning   { color: #FFB020; }
+  .hp-warning-bg { background-color: rgba(255, 176, 32, 0.12); border-color: rgba(255, 176, 32, 0.35); }
+
+  .hp-critical  { color: #FF4D4F; }
+  .hp-critical-bg { background-color: rgba(255, 77, 79, 0.12); border-color: rgba(255, 77, 79, 0.40); }
+
+  /* Live / telemetry — sparkline, pulse dots, live indicators */
+  .hp-live      { color: #3BC7FF; }
+  .hp-live-bg   { background-color: rgba(59, 199, 255, 0.10); border-color: rgba(59, 199, 255, 0.30); }
+
+  /* Signature violet glow — primary banners / status spotlight only */
+  .hp-violet-glow {
+    background-image: radial-gradient(
+      ellipse at top right,
+      rgba(108, 92, 231, 0.08) 0%,
+      rgba(108, 92, 231, 0.04) 40%,
+      transparent 70%
+    );
+  }
+
+  /* Severity chips — subtle, not screaming */
+  .sev-low       { color: #2EE59D; background-color: rgba(46, 229, 157, 0.12); border-color: rgba(46, 229, 157, 0.35); }
+  .sev-medium    { color: #FFB020; background-color: rgba(255, 176, 32, 0.12); border-color: rgba(255, 176, 32, 0.35); }
+  .sev-high      { color: #FFB020; background-color: rgba(255, 176, 32, 0.18); border-color: rgba(255, 176, 32, 0.45); }
+  .sev-critical  { color: #FF4D4F; background-color: rgba(255, 77, 79, 0.15); border-color: rgba(255, 77, 79, 0.45); }
+
+  /* Domain — IT (cyan), OT (violet signature), IoT (muted violet) */
+  .dom-it        { color: #3BC7FF; background-color: rgba(59, 199, 255, 0.10); border-color: rgba(59, 199, 255, 0.30); }
+  .dom-ot        { color: #B8B0FF; background-color: rgba(108, 92, 231, 0.12); border-color: rgba(108, 92, 231, 0.35); }
+  .dom-iot       { color: #9AA7B2; background-color: rgba(154, 167, 178, 0.10); border-color: rgba(154, 167, 178, 0.30); }
 }

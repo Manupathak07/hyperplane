@@ -81,7 +81,7 @@ export default function IncidentsPage() {
       )}
 
       {isError && (
-        <div className="rounded-md border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
+        <div className="rounded-md border p-4 text-sm hp-critical hp-critical-bg">
           Could not load incidents: {(error as Error).message}
         </div>
       )}
@@ -170,13 +170,13 @@ function Stat({
   value: number;
   tone: "ok" | "warn" | "bad" | "muted" | "neutral";
 }) {
-  const toneClass =
+  const valueClass =
     tone === "ok"
-      ? "text-emerald-300"
+      ? "hp-healthy"
       : tone === "warn"
-        ? "text-amber-300"
+        ? "hp-warning"
         : tone === "bad"
-          ? "text-red-300"
+          ? "hp-critical"
           : tone === "neutral"
             ? "text-foreground"
             : "text-muted-foreground";
@@ -185,7 +185,7 @@ function Stat({
       <div className="text-xs uppercase tracking-wider text-muted-foreground">
         {label}
       </div>
-      <div className={`mt-1 text-2xl font-semibold tabular-nums ${toneClass}`}>
+      <div className={`mt-1 text-2xl font-semibold tabular-nums ${valueClass}`}>
         {value}
       </div>
     </div>

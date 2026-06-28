@@ -16,7 +16,7 @@ export default function HealthPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      {/* ── PRIMARY: status banner ───────────────────────────────────── */}
+      {/* ── PRIMARY: status banner with subtle violet signature glow ── */}
       {isLoading && <Banner tone="muted">Checking backend…</Banner>}
       {isError && (
         <Banner tone="bad">
@@ -25,7 +25,7 @@ export default function HealthPage() {
           <button
             type="button"
             onClick={() => refetch()}
-            className="mt-3 rounded-md border border-red-500/40 px-2 py-1 text-xs hover:bg-red-500/15"
+            className="mt-3 rounded-md border px-2 py-1 text-xs hover:bg-red-500/15 hp-critical-bg"
           >
             Retry
           </button>
@@ -35,14 +35,18 @@ export default function HealthPage() {
         <Banner tone={data.status === "ok" ? "ok" : "warn"}>
           <div className="flex items-center gap-3">
             <span className="relative flex h-3 w-3">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-400" />
+              <span
+                className="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
+                style={{ backgroundColor: "#2EE59D" }}
+              />
+              <span
+                className="relative inline-flex h-3 w-3 rounded-full"
+                style={{ backgroundColor: "#2EE59D" }}
+              />
             </span>
             <div>
-              <div className="text-sm font-semibold">
-                {data.status === "ok"
-                  ? "All systems operational"
-                  : "System degraded"}
+              <div className="text-sm font-semibold hp-healthy">
+                {data.status === "ok" ? "All systems operational" : "System degraded"}
               </div>
               <div className="text-xs text-muted-foreground">
                 {data.service} · {data.database === "up" ? "database connected" : "database down"}
@@ -81,9 +85,9 @@ export default function HealthPage() {
         </section>
       )}
 
-      {/* ── DEBUG: collapsible raw response (least visual weight) ──── */}
+      {/* ── DEBUG: collapsible raw response ─────────────────────────── */}
       <AccordionItem title="View raw response" defaultOpen={false}>
-        <pre className="overflow-auto rounded-md bg-background/50 p-3 text-xs leading-relaxed">
+        <pre className="overflow-auto rounded-md p-3 text-xs leading-relaxed hp-live-bg">
           {JSON.stringify(data ?? { loading: true }, null, 2)}
         </pre>
       </AccordionItem>
@@ -127,14 +131,18 @@ function Banner({
 }) {
   const cls =
     tone === "ok"
-      ? "border-emerald-500/40 bg-emerald-500/10"
+      ? "hp-healthy-bg"
       : tone === "warn"
-        ? "border-amber-500/40 bg-amber-500/10"
+        ? "hp-warning-bg"
         : tone === "bad"
-          ? "border-red-500/40 bg-red-500/10"
-          : "border-border bg-card";
+          ? "hp-critical-bg"
+          : "border border-border bg-card";
   return (
-    <div className={`rounded-md border p-4 ${cls}`}>{children}</div>
+    <div className={`relative overflow-hidden rounded-md border p-4 ${cls}`}>
+      {/* Signature violet glow — only on the primary banner */}
+      {tone === "ok" && <div className="hp-violet-glow absolute inset-0 pointer-events-none" />}
+      <div className="relative">{children}</div>
+    </div>
   );
 }
 
@@ -149,14 +157,14 @@ function MetricCard({
   value: string;
   tone: "ok" | "warn" | "bad" | "neutral";
 }) {
-  const toneClass =
+  const valueClass =
     tone === "ok"
-      ? "text-emerald-300 bg-emerald-500/15"
+      ? "hp-healthy-bg hp-healthy"
       : tone === "warn"
-        ? "text-amber-300 bg-amber-500/15"
+        ? "hp-warning-bg hp-warning"
         : tone === "bad"
-          ? "text-red-300 bg-red-500/15"
-          : "text-cyan-300 bg-cyan-500/15";
+          ? "hp-critical-bg hp-critical"
+          : "hp-live-bg hp-live";
   return (
     <div className="rounded-md border border-border bg-card p-4">
       <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
@@ -164,7 +172,7 @@ function MetricCard({
         {label}
       </div>
       <div
-        className={`mt-2 inline-flex items-center rounded-md px-2 py-0.5 text-sm font-medium ${toneClass}`}
+        className={`mt-2 inline-flex items-center rounded-md border px-2 py-0.5 text-sm font-medium ${valueClass}`}
       >
         {value}
       </div>

@@ -9,15 +9,14 @@ interface Props {
 }
 
 /**
- * Live system indicator: pulse dot + last-updated + heartbeat animation.
- * Sits next to the HealthPill in the Header so the user always sees the
- * system is "breathing".
+ * Live system indicator: cyan pulse dot + last-updated + heartbeat.
+ * Per the colour rules, this uses --hp-live (cyan) — cyan is reserved for
+ * live/telemetry only.
  */
 export default function LiveIndicator({ intervalMs = 30_000 }: Props) {
-  const { last } = useLatencyTracker(intervalMs / 6); // sample 6x more often than the pill refresh
+  const { last } = useLatencyTracker(intervalMs / 6);
   const [now, setNow] = useState(Date.now());
 
-  // re-render once a second so the "Xs ago" stays fresh
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1_000);
     return () => clearInterval(t);
@@ -37,14 +36,13 @@ export default function LiveIndicator({ intervalMs = 30_000 }: Props) {
         <span
           className={cn(
             "absolute inline-flex h-full w-full rounded-full opacity-75",
-            recent ? "bg-emerald-400 animate-ping" : "bg-muted-foreground/40",
+            recent ? "animate-ping" : "",
           )}
+          style={{ backgroundColor: recent ? "#3BC7FF" : "#5B6B7A" }}
         />
         <span
-          className={cn(
-            "relative inline-flex h-2 w-2 rounded-full",
-            recent ? "bg-emerald-400" : "bg-muted-foreground/40",
-          )}
+          className="relative inline-flex h-2 w-2 rounded-full"
+          style={{ backgroundColor: recent ? "#3BC7FF" : "#5B6B7A" }}
         />
       </span>
       <Radio className="h-3 w-3" />

@@ -1,5 +1,4 @@
 import { useLatencyTracker } from "@/hooks/useLatencyTracker";
-import { cn } from "@/lib/utils";
 
 interface Props {
   intervalMs?: number;
@@ -8,8 +7,7 @@ interface Props {
 
 /**
  * SVG sparkline of recent /health response latency.
- * Pure SVG — no charting library — so the bundle stays small.
- * Y-axis auto-scales to the max sample in the current window.
+ * Cyan-only gradient — cyan is reserved for live data, never for interactive UI.
  */
 export default function LatencySparkline({ intervalMs = 5_000, height = 60 }: Props) {
   const { samples, last } = useLatencyTracker(intervalMs);
@@ -17,7 +15,7 @@ export default function LatencySparkline({ intervalMs = 5_000, height = 60 }: Pr
   if (samples.length === 0) {
     return (
       <div
-        className="flex h-[60px] items-center justify-center text-xs text-muted-foreground"
+        className="flex items-center justify-center text-xs text-muted-foreground"
         style={{ height }}
       >
         collecting samples…
@@ -27,7 +25,7 @@ export default function LatencySparkline({ intervalMs = 5_000, height = 60 }: Pr
 
   const W = 240;
   const H = height;
-  const P = 6; // padding
+  const P = 6;
   const max = Math.max(...samples.map((s) => s.ms), 50);
   const min = Math.min(...samples.map((s) => s.ms), 0);
   const range = Math.max(max - min, 1);
@@ -43,13 +41,12 @@ export default function LatencySparkline({ intervalMs = 5_000, height = 60 }: Pr
     .join(" ");
   const areaPath = `${path} L${pts[pts.length - 1][0]},${H - P} L${pts[0][0]},${H - P} Z`;
 
-  const avg =
-    samples.reduce((acc, s) => acc + s.ms, 0) / samples.length;
+  const avg = samples.reduce((acc, s) => acc + s.ms, 0) / samples.length;
 
   return (
     <div className="space-y-2">
       <div className="flex items-baseline justify-between">
-        <div className="font-mono text-lg tabular-nums">
+        <div className="text-lg tabular-nums" style={{ color: "#3BC7FF" }}>
           {last ? `${last.ms}` : "—"}
           <span className="ml-1 text-xs text-muted-foreground">ms</span>
         </div>
@@ -66,15 +63,15 @@ export default function LatencySparkline({ intervalMs = 5_000, height = 60 }: Pr
       >
         <defs>
           <linearGradient id="spark-grad" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="rgb(34, 211, 238)" stopOpacity="0.45" />
-            <stop offset="100%" stopColor="rgb(34, 211, 238)" stopOpacity="0" />
+            <stop offset="0%" stopColor="#3BC7FF" stopOpacity="0.45" />
+            <stop offset="100%" stopColor="#3BC7FF" stopOpacity="0" />
           </linearGradient>
         </defs>
         <path d={areaPath} fill="url(#spark-grad)" />
         <path
           d={path}
           fill="none"
-          stroke="rgb(34, 211, 238)"
+          stroke="#3BC7FF"
           strokeWidth="1.5"
           strokeLinejoin="round"
           strokeLinecap="round"
@@ -84,8 +81,8 @@ export default function LatencySparkline({ intervalMs = 5_000, height = 60 }: Pr
             cx={pts[pts.length - 1][0]}
             cy={pts[pts.length - 1][1]}
             r="2.5"
-            fill="rgb(34, 211, 238)"
-            className={cn("animate-pulse")}
+            fill="#3BC7FF"
+            className="animate-pulse"
           />
         )}
       </svg>
