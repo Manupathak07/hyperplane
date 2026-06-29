@@ -37,6 +37,7 @@ class IncidentRead(BaseModel):
     severity: Severity
     status: IncidentStatus
     raw_event: dict
+    rule_hits: list[dict] = []
     created_at: datetime
     updated_at: datetime
 

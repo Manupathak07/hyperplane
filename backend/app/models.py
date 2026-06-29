@@ -99,6 +99,9 @@ class Incident(Base):
         default=IncidentStatus.NEW,
     )
     raw_event: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    # Rule-engine output — list of {rule_id, rule_name, severity, confidence,
+    # matched, description}. Always a list (possibly empty).
+    rule_hits: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow
     )

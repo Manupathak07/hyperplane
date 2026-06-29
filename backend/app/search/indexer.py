@@ -53,6 +53,7 @@ def _incident_to_doc(inc: Incident) -> dict[str, Any]:
         "asset_id": raw.get("asset_id"),
         "tags": raw.get("tags") or [],
         "labels": raw.get("labels") or {},
+        "rule_hits": list(getattr(inc, "rule_hits", []) or []),
         "raw": raw.get("raw"),
         "created_at": inc.created_at.isoformat() if inc.created_at else None,
         "updated_at": inc.updated_at.isoformat() if inc.updated_at else None,

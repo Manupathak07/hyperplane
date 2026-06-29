@@ -44,6 +44,7 @@ INCIDENT_MAPPING: dict = {
             "asset_id": {"type": "keyword"},
             "tags": {"type": "keyword"},
             "labels": {"type": "object", "enabled": True},
+            "rule_hits": {"type": "object", "enabled": True},
             "raw": {"type": "text"},
             "created_at": {"type": "date"},
             "updated_at": {"type": "date"},
