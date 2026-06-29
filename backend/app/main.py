@@ -13,15 +13,19 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.db import engine
-from app.routes import events, health, incidents
+from app.routes import events, health, incidents, search
+from app.search import close_es, ensure_index
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: nothing to do — engine is created lazily on first use
+    # Startup: ensure the ES index exists. Idempotent — logs and moves on if ES
+    # is unreachable so the rest of the API still works.
+    await ensure_index()
     yield
-    # Shutdown: dispose the engine so connections close cleanly
+    # Shutdown: dispose the engine and close the ES client cleanly.
     await engine.dispose()
+    await close_es()
 
 
 app = FastAPI(
@@ -46,6 +50,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(incidents.router)
 app.include_router(events.router)
+app.include_router(search.router)
 
 
 @app.get("/", tags=["meta"])

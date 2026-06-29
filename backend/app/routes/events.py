@@ -23,6 +23,7 @@ from app.db import get_session
 from app.ingestion.auth import require_api_key
 from app.ingestion.normalizer import NormalisedEvent, severity_to_enum
 from app.models import Incident, IncidentStatus, Severity
+from app.search.indexer import index_incident
 
 router = APIRouter(prefix="/events", tags=["ingest"])
 
@@ -97,16 +98,28 @@ async def _insert_one(session: AsyncSession, event: NormalisedEvent) -> EventRes
     await session.commit()
 
     if row is None:
-        # Duplicate — fetch the existing incident id
+        # Duplicate — fetch the existing incident id and re-index it (idempotent
+        # upsert, harmless if it was already there).
         existing = await session.execute(
             select(Incident).where(Incident.event_id == event.event_id)
         )
         existing_row = existing.scalar_one_or_none()
+        if existing_row is not None:
+            await index_incident(existing_row)
         return EventResult(
             event_id=event.event_id, status="duplicate",
             id=existing_row.id if existing_row else None,
         )
 
+    # Newly inserted — the incident ORM object isn't attached to the session
+    # (we used a low-level pg_insert), so re-fetch via event_id to get a
+    # persistent instance for ES indexing.
+    fresh = await session.execute(
+        select(Incident).where(Incident.event_id == event.event_id)
+    )
+    fresh_row = fresh.scalar_one_or_none()
+    if fresh_row is not None:
+        await index_incident(fresh_row)
     return EventResult(event_id=event.event_id, status="created", id=row)
 
 
