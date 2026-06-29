@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.db import engine
-from app.routes import events, health, incidents, search
+from app.routes import events, health, incidents, investigate, search
 from app.search import close_es, ensure_index
 
 
@@ -51,6 +51,7 @@ app.include_router(health.router)
 app.include_router(incidents.router)
 app.include_router(events.router)
 app.include_router(search.router)
+app.include_router(investigate.router)
 
 
 @app.get("/", tags=["meta"])
