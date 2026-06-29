@@ -30,6 +30,9 @@ export interface HealthResponse {
 
 export interface Incident {
   id: string;
+  event_id: string;
+  event_type: string | null;
+  correlation_id: string | null;
   title: string;
   description: string | null;
   source: string;
@@ -113,7 +116,7 @@ export const apiPost = <T>(path: string, body: unknown) =>
 
 export const api = {
   health: () => apiGet<HealthResponse>("/health"),
-  listIncidents: (limit = 50) =>
+  listIncidents: (limit = 200) =>
     apiGet<Incident[]>(`/incidents/?limit=${limit}`),
   getIncident: (id: string) => apiGet<Incident>(`/incidents/${id}`),
 } as const;

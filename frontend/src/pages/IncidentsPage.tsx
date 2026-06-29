@@ -5,6 +5,7 @@ import { AlertTriangle, RefreshCw } from "lucide-react";
 import { api } from "@/lib/api";
 import SeverityBadge from "@/components/incidents/SeverityBadge";
 import DomainBadge from "@/components/incidents/DomainBadge";
+import CorrelationBadge from "@/components/incidents/CorrelationBadge";
 import { formatDateTime, formatRelative } from "@/lib/utils";
 
 type Counts = {
@@ -17,7 +18,7 @@ type Counts = {
 export default function IncidentsPage() {
   const { data, isLoading, isError, error, refetch, isRefetching } = useQuery({
     queryKey: ["incidents"],
-    queryFn: () => api.listIncidents(50),
+    queryFn: () => api.listIncidents(200),
     refetchInterval: 15_000,
   });
 
@@ -105,54 +106,68 @@ export default function IncidentsPage() {
             <thead className="border-b border-border bg-background/50 text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
                 <th className="px-4 py-2 text-left font-medium">Title</th>
+                <th className="px-4 py-2 text-left font-medium">Event Type</th>
                 <th className="px-4 py-2 text-left font-medium">Severity</th>
                 <th className="px-4 py-2 text-left font-medium">Domain</th>
                 <th className="px-4 py-2 text-left font-medium">Status</th>
                 <th className="px-4 py-2 text-left font-medium">Source</th>
+                <th className="px-4 py-2 text-left font-medium">Corr</th>
                 <th className="px-4 py-2 text-right font-medium">Detected</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {data.map((inc) => (
-                <tr
-                  key={inc.id}
-                  className="transition-colors hover:bg-accent/40"
-                >
-                  <td className="px-4 py-3">
-                    <Link
-                      to={`/incidents/${inc.id}`}
-                      className="font-medium text-foreground hover:text-primary"
-                    >
-                      {inc.title}
-                    </Link>
-                    {inc.description && (
-                      <div className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                        {inc.description}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <SeverityBadge value={inc.severity} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <DomainBadge value={inc.domain} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="rounded bg-muted px-2 py-0.5 text-xs uppercase tracking-wide text-muted-foreground">
-                      {inc.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                    {inc.source}
-                  </td>
-                  <td
-                    className="px-4 py-3 text-right text-xs text-muted-foreground"
-                    title={formatDateTime(inc.created_at)}
+              {data.map((inc) => {
+                const sevNumeric =
+                  typeof inc.raw_event?.severity_numeric === "number"
+                    ? (inc.raw_event.severity_numeric as number)
+                    : null;
+                return (
+                  <tr
+                    key={inc.id}
+                    className="transition-colors hover:bg-accent/40"
                   >
-                    {formatRelative(inc.created_at)}
-                  </td>
-                </tr>
-              ))}
+                    <td className="px-4 py-3">
+                      <Link
+                        to={`/incidents/${inc.id}`}
+                        className="font-medium text-foreground hover:text-primary"
+                      >
+                        {inc.title}
+                      </Link>
+                      {inc.description && (
+                        <div className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+                          {inc.description}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                      {inc.event_type ?? "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      <SeverityBadge value={inc.severity} numeric={sevNumeric} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <DomainBadge value={inc.domain} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="rounded bg-muted px-2 py-0.5 text-xs uppercase tracking-wide text-muted-foreground">
+                        {inc.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                      {inc.source}
+                    </td>
+                    <td className="px-4 py-3">
+                      <CorrelationBadge correlationId={inc.correlation_id} />
+                    </td>
+                    <td
+                      className="px-4 py-3 text-right text-xs text-muted-foreground"
+                      title={formatDateTime(inc.created_at)}
+                    >
+                      {formatRelative(inc.created_at)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -8,15 +8,29 @@ const STYLES: Record<Severity, string> = {
   critical: "sev-critical",
 };
 
-export default function SeverityBadge({ value }: { value: Severity }) {
+/**
+ * Renders a severity pill. When `numeric` is provided (0-10) we show the
+ * number — useful for the dashboard where the precise level matters more
+ * than the bucketed label. Falls back to the categorical label otherwise.
+ */
+export default function SeverityBadge({
+  value,
+  numeric,
+}: {
+  value: Severity;
+  numeric?: number | null;
+}) {
+  const display =
+    typeof numeric === "number" ? numeric.toString() : value.toUpperCase();
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium uppercase tracking-wide",
+        "inline-flex h-6 min-w-[2rem] items-center justify-center rounded-md border px-2 text-xs font-semibold tabular-nums",
         STYLES[value],
       )}
+      title={typeof numeric === "number" ? `Severity ${numeric}/10` : value}
     >
-      {value}
+      {display}
     </span>
   );
 }
