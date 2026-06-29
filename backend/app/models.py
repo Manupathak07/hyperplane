@@ -73,9 +73,18 @@ class Incident(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    # Idempotency key — ingest endpoint dedupes on this. Unique.
+    event_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), unique=True, index=True, nullable=False
+    )
+    # Optional correlation chain id — multiple incidents can share one.
+    correlation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True, index=True
+    )
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     source: Mapped[str] = mapped_column(String(64), nullable=False)
+    event_type: Mapped[str] = mapped_column(String(128), nullable=False, default="unknown")
     domain: Mapped[Domain] = mapped_column(
         SAEnum(Domain, name="domain_enum", values_callable=lambda e: [m.value for m in e]), nullable=False
     )

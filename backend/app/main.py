@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.db import engine
-from app.routes import health, incidents
+from app.routes import events, health, incidents
 
 
 @asynccontextmanager
@@ -45,6 +45,7 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(incidents.router)
+app.include_router(events.router)
 
 
 @app.get("/", tags=["meta"])

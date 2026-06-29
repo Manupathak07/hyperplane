@@ -41,6 +41,13 @@ class IncidentRead(BaseModel):
     updated_at: datetime
 
 
+# Minimal read for ingestion /events — exposes event_id + correlation_id
+class IncidentReadWithProvenance(IncidentRead):
+    event_id: uuid.UUID
+    correlation_id: uuid.UUID | None = None
+    event_type: str | None = None
+
+
 # --- Agent trace ----------------------------------------------------------
 
 

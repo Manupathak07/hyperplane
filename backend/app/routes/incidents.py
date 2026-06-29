@@ -8,7 +8,12 @@ from sqlalchemy.orm import selectinload
 
 from app.db import get_session
 from app.models import Incident
-from app.schemas import IncidentCreate, IncidentDetail, IncidentRead
+from app.schemas import (
+    IncidentCreate,
+    IncidentDetail,
+    IncidentRead,
+    IncidentReadWithProvenance,
+)
 
 router = APIRouter(prefix="/incidents", tags=["incidents"])
 
@@ -25,11 +30,18 @@ async def create_incident(
     return incident
 
 
-@router.get("/", response_model=list[IncidentRead])
+@router.get("/", response_model=list[IncidentReadWithProvenance])
 async def list_incidents(
     limit: int = 50,
     session: AsyncSession = Depends(get_session),
 ) -> list[Incident]:
+    """List recent incidents.
+
+    Returns the provenance-enriched shape (event_id, event_type, correlation_id)
+    so the dashboard can render an `event_type` column and a correlation badge
+    without a second round-trip. `correlation_id` powers Week 4's scenario
+    stitching and Week 6's Detection-agent output.
+    """
     stmt = (
         select(Incident)
         .order_by(Incident.created_at.desc())

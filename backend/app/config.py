@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     llm_model: str = "llama3.1:8b"
     ollama_host: str = "http://host.docker.internal:11434"
 
+    # --- Ingestion auth (Week 4) ---
+    # If empty/unset, POST /events is open. If set, X-API-Key header must match.
+    events_api_key: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
