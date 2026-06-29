@@ -69,6 +69,7 @@ services:
       - LLM_MODEL=llama3.1:8b
       - ENVIRONMENT=dev
       - LOG_LEVEL=INFO
+      - EVENTS_API_KEY=${EVENTS_API_KEY:-dev-shared-key-change-me}
     ports:
       - "8000:8000"
     depends_on:
@@ -76,6 +77,37 @@ services:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - hyperplane-net
+
+  # ---------------------------------------------------------------------------
+  # Generator — synthetic log/event producer (Week 4).
+  # Reuses the backend image (same Python + httpx), runs scripts/generator.py
+  # instead of uvicorn. Calls POST /events/ on the backend service.
+  # ---------------------------------------------------------------------------
+  generator:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: hyperplane-backend:dev
+    container_name: hyperplane-generator
+    # Override the image ENTRYPOINT (entrypoint.sh runs migrations + uvicorn).
+    # For the generator we only want the Python script.
+    entrypoint: ["python", "-m", "scripts.generator"]
+    restart: unless-stopped
+    environment:
+      - HYPERPLANE_API=http://backend:8000
+      - EVENTS_API_KEY=${EVENTS_API_KEY:-dev-shared-key-change-me}
+      - GEN_MODE=${GEN_MODE:-SCENARIO_CORRELATED}
+      - GEN_BATCH_SIZE=${GEN_BATCH_SIZE:-4}
+      - GEN_INTERVAL_SEC=${GEN_INTERVAL_SEC:-8}
+      - GEN_MAX_BATCHES=${GEN_MAX_BATCHES:-0}
+      - LOG_LEVEL=INFO
+    depends_on:
+      backend:
+        condition: service_started
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
