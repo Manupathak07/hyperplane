@@ -26,6 +26,15 @@ class Settings(BaseSettings):
     # If empty/unset, POST /events is open. If set, X-API-Key header must match.
     events_api_key: str = ""
 
+    # --- Threat Intel (Week 6) ---
+    # Leave empty to use the deterministic IP-heuristic fallback (RFC5737 +
+    # private). Set both to enable live OTX + AbuseIPDB lookups.
+    # Free tier limits are fine for demo traffic.
+    otx_api_key: str = ""
+    abuseipdb_api_key: str = ""
+    # In-process TTL for the lookup cache, in seconds.
+    threatintel_cache_ttl_s: int = 3600
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

@@ -1,23 +1,26 @@
 """Threat-intel rules (lightweight, in-memory).
 
-This is the cheap pre-LLM layer. Real Threat Intel agent (Week 7) will hit
-OTX/AbuseIPDB and produce richer findings; these rules give us something to
-say immediately for known-bad test IPs.
+Two layers:
 
-For now we hard-code:
-  - 198.51.100.0/24 — "attacker" test net (RFC5737 documentation range)
-  - 192.0.2.0/24    — second test net
-  - 203.0.113.0/24  — third test net
-Any src in these ranges is flagged as "known-test-net" — a low-confidence
-indicator that the operator can dismiss.
+  1. IP-range heuristics (ti_known_test_net, ti_internal_suspicious) — cheap
+     static checks that don't need a network call. Useful even when the
+     Threat Intel agent has no signal (e.g. no `src` on the event).
 
-Production: replace with OTX pulse cache + AbuseIPDB check (Week 7).
+  2. ti_high_score — fires when the Week-6 Threat Intel agent has already
+     attached a score ≥ 70 to this incident. Bumps severity to `critical`.
+     This is the integration point between the agent pipeline and the rule
+     engine: rules raise severity floors based on agent output, the agent
+     then re-reads rule_hits on the next investigate pass.
 """
 from __future__ import annotations
 
 import ipaddress
 
 from .engine import EvalContext
+
+# Score ≥ this → severity floor = critical. Matches the spec locked in the
+# 2026-06-29 checkpoint.
+TI_CRITICAL_THRESHOLD = 70
 
 # Known test/documentation ranges (RFC5737). In real life this would be a
 # cache of OTX pulses + AbuseIPDB responses.
@@ -79,5 +82,25 @@ def evaluate(ctx: EvalContext) -> list[dict]:
                     f"possible lateral movement."
                 ),
             })
+
+    # Agent-driven rule: if the Threat Intel agent already attached a high
+    # score, escalate to critical. This is what makes "TI score ≥ 70 → critical"
+    # flow through the rest of the pipeline (severity bump + dashboard badge).
+    if ctx.threat_intel_score >= TI_CRITICAL_THRESHOLD:
+        hits.append({
+            "rule_id": "ti_high_score",
+            "rule_name": "Threat intel score ≥ 70",
+            "severity": "high",
+            "confidence": 0.9,
+            "matched": {
+                "threat_intel_score": ctx.threat_intel_score,
+                "threshold": TI_CRITICAL_THRESHOLD,
+                "severity_floor": "critical",
+            },
+            "description": (
+                f"Threat intel score {ctx.threat_intel_score}/100 ≥ "
+                f"{TI_CRITICAL_THRESHOLD} → severity bumped to critical."
+            ),
+        })
 
     return hits

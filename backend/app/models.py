@@ -102,6 +102,12 @@ class Incident(Base):
     # Rule-engine output — list of {rule_id, rule_name, severity, confidence,
     # matched, description}. Always a list (possibly empty).
     rule_hits: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
+    # Threat-Intel agent output for this incident. Shape (Week 6):
+    #   {"score": int, "sources": {otx: {...}|None, abuseipdb: {...}|None},
+    #    "hits": [{"source": str, "label": str}], "checked_at": iso8601}
+    # Default {} so existing rows stay valid; populated by the Threat Intel
+    # node when /investigate runs.
+    threat_intel: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow
     )

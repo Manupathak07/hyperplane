@@ -45,11 +45,23 @@ class EvalContext:
     raw: str | None
     tags: list[str] = field(default_factory=list)
     correlation_id: str | None = None
+    # Week 6 — Threat Intel agent score (0-100). Populated from the incident's
+    # `threat_intel` JSONB column. 0 = no signal (no agent run yet, or no IP).
+    threat_intel_score: int = 0
 
     @classmethod
     def from_incident_dict(cls, inc: dict) -> "EvalContext":
         """Build from an Incident ORM row (or any dict with the same keys)."""
         raw_event = inc.raw_event or {} if hasattr(inc, "raw_event") else inc.get("raw_event") or {}
+        # Week 6 — `threat_intel` is a JSONB column on Incident. It's either
+        # the ORM attribute, the dict key, or missing (legacy rows default
+        # to {} via the migration's server_default).
+        ti = getattr(inc, "threat_intel", None)
+        if ti is None:
+            ti = inc.get("threat_intel") if isinstance(inc, dict) else None
+        ti = ti or {}
+        ti_score = int(ti.get("score", 0) or 0)
+
         return cls(
             incident_id=str(getattr(inc, "id", inc.get("id"))),
             title=getattr(inc, "title", inc.get("title", "")),
@@ -66,6 +78,7 @@ class EvalContext:
             raw=raw_event.get("raw"),
             tags=list(raw_event.get("tags") or []),
             correlation_id=str(getattr(inc, "correlation_id", inc.get("correlation_id")) or "") or None,
+            threat_intel_score=ti_score,
         )
 
 

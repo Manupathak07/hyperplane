@@ -24,6 +24,9 @@ class AgentState(TypedDict, total=False):
 
     # Populated as agents run.
     triage: dict            # TriageAgent output
+    # Week 6 — ThreatIntelAgent output envelope (see app/threatintel/agent.py):
+    #   {"ip", "score", "sources", "hits", "checked_at"}.
+    threat_intel: dict
     needs_investigation: bool
     summary: str            # one-line human summary for the dashboard
 

@@ -46,5 +46,6 @@ async def investigate_incident(
         "final_decision": final_state.get("final_decision"),
         "summary": final_state.get("summary"),
         "triage": final_state.get("triage"),
+        "threat_intel": final_state.get("threat_intel"),
         "trace_ids": final_state.get("trace_ids", []),
     }
