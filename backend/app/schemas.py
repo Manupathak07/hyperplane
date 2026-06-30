@@ -38,6 +38,9 @@ class IncidentRead(BaseModel):
     status: IncidentStatus
     raw_event: dict
     rule_hits: list[dict] = []
+    # Week 6: Threat Intel envelope (JSONB on the Incident row).
+    # Empty dict until /investigate populates it.
+    threat_intel: dict = {}
     created_at: datetime
     updated_at: datetime
 

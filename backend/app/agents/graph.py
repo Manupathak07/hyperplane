@@ -1,6 +1,6 @@
 """LangGraph state graph for the HyperPlane investigation pipeline.
 
-Topology (Week 6):
+Topology (Week 7):
 
     START
       │
@@ -13,7 +13,14 @@ between, persisting its envelope as both:
   - Incident.threat_intel           (JSONB column, for the dashboard)
   - one AgentTrace row              (step=2, agent=threat_intel)
 
-Weeks 7-10 will add Enrichment / Detection / Response between TI and decide
+Week 7 adds a **severity write-back** at the tail of `run_investigation`:
+after the graph runs, we re-evaluate rules against the now-TI-populated
+state and bump the persisted Incident.severity if any rule (typically
+`ti_high_score`) demands a higher floor. Without this, ingestion-time
+severity (computed before the agent graph populates `threat_intel`) is
+what the dashboard shows — even if TI then sees a score of 90.
+
+Weeks 8-10 will add Enrichment / Detection / Response between TI and decide
 and wrap the whole thing in an LLM-backed Supervisor.
 """
 from __future__ import annotations
@@ -28,6 +35,7 @@ from app.agents.state import AgentState
 from app.agents.threat_intel_node import threat_intel_node
 from app.agents.tracing import record_trace
 from app.agents.triage import decide_node, triage_node
+from app.rules import EvalContext, evaluate, recompute_severity, severity_enum_for
 
 log = logging.getLogger(__name__)
 
@@ -146,6 +154,48 @@ async def run_investigation(
         started_at=0.0,
     )
     trace_ids.append(str(trace_id))
+
+    # ── Week 7 — severity write-back ────────────────────────────────────────
+    # Ingestion-time rules ran with threat_intel_score=0 (TI hadn't fired
+    # yet). Now that TI has populated `incident.threat_intel`, re-run the
+    # rules and bump the persisted severity if any new hit demands a higher
+    # floor (typically `ti_high_score` → critical).
+    try:
+        # Re-serialise so the EvalContext sees the *just-written* TI envelope.
+        refreshed_dict = _incident_to_dict(incident_row)
+        post_ctx = EvalContext.from_incident_dict(refreshed_dict)
+        post_hits = evaluate(post_ctx)
+
+        current_sev = (
+            incident_row.severity.value
+            if hasattr(incident_row.severity, "value")
+            else str(incident_row.severity)
+        )
+        new_sev_label = recompute_severity(current_sev, post_hits)
+
+        if new_sev_label != current_sev:
+            log.info(
+                "severity write-back: %s → %s for incident %s",
+                current_sev, new_sev_label, incident_uuid,
+            )
+            incident_row.severity = severity_enum_for(new_sev_label)
+
+        # Merge any new post-graph hits into the persisted rule_hits list.
+        # De-dup by (rule_id, severity_floor) so re-running investigate on
+        # the same incident doesn't double-append.
+        existing_keys = {
+            (h.get("rule_id"), (h.get("matched") or {}).get("severity_floor"))
+            for h in (incident_row.rule_hits or [])
+        }
+        for h in post_hits:
+            key = (h.get("rule_id"), (h.get("matched") or {}).get("severity_floor"))
+            if key not in existing_keys:
+                incident_row.rule_hits = (incident_row.rule_hits or []) + [h]
+                existing_keys.add(key)
+    except Exception as e:
+        # Never let a write-back bug block an investigation from completing.
+        log.warning("severity write-back failed for %s: %s", incident_uuid, e)
+    # ────────────────────────────────────────────────────────────────────────
 
     final_state["trace_ids"] = trace_ids
     return final_state
