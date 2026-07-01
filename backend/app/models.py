@@ -8,6 +8,7 @@ Three tables back the 6-agent pipeline:
 """
 import enum
 import uuid
+from typing import List, Optional
 from datetime import datetime
 
 from sqlalchemy import (
@@ -115,6 +116,11 @@ class Incident(Base):
         DateTime(timezone=True),
         default=datetime.utcnow,
         onupdate=datetime.utcnow,
+    detection_score: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    attack_stage: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    related_incident_ids: Mapped[List[uuid.UUID]] = mapped_column(ARRAY(UUID(as_uuid=True)), nullable=False, default=list)
+    detection_details: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+
     )
 
     traces: Mapped[list["AgentTrace"]] = relationship(

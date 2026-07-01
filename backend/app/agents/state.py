@@ -31,6 +31,10 @@ class AgentState(TypedDict, total=False):
     #   {"source_ip", "destination_ip", "geo", "asset_id", "user_id",
     #    "mitre_tactics", "mitre_techniques", "threat_score", "indicators"}
     enrichment: dict
+    # Week 9 — DetectionAgent output envelope:
+    #   {"detection_score", "attack_stage", "reasoning",
+    #    "related_incident_ids", "detection_details"}
+    detection: dict
     needs_investigation: bool
     summary: str            # one-line human summary for the dashboard
 

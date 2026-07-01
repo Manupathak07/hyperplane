@@ -1,11 +1,11 @@
 """LangGraph state graph for the HyperPlane investigation pipeline.
 
-Topology (Week 8):
+Topology (Week 9):
 
     START
       │
       ▼
-    triage_step ──▶ threat_intel_step ──▶ enrichment_step ──▶ decide_step ──▶ END
+    triage_step ──▶ threat_intel_step ──▶ enrichment_step ──▶ detection_step ──▶ decide_step ──▶ END
 
 Week 5 had just triage → decide. Week 6 inserts the Threat Intel agent in
 between, persisting its envelope as both:
@@ -23,6 +23,9 @@ what the dashboard shows — even if TI then sees a score of 90.
 Week 8 adds the Enrichment agent between Threat Intel and Decide,
 adding contextual information like GeoIP, asset/user enrichment,
 MITRE ATT&CK mapping, and threat scoring.
+
+Week 9 adds the Detection agent after Enrichment, producing a detection
+score, attack stage, and basic correlation info.
 """
 from __future__ import annotations
 
@@ -33,6 +36,7 @@ from typing import Any
 from langgraph.graph import END, START, StateGraph
 
 from app.agents.state import AgentState
+from app.agents.detection_node import detection_node
 from app.agents.enrichment_node import enrichment_node
 from app.agents.threat_intel_node import threat_intel_node
 from app.agents.tracing import record_trace
@@ -50,17 +54,19 @@ def build_graph() -> Any:
 
     Node names are distinct from state keys (LangGraph enforces this — node
     names become graph channels). We use `triage_step`, `threat_intel_step`,
-    `enrichment_step`, and `decide_step`.
+    `enrichment_step`, `detection_step`, and `decide_step`.
     """
     g = StateGraph(AgentState)
     g.add_node("triage_step", triage_node)
     g.add_node("threat_intel_step", threat_intel_node)
     g.add_node("enrichment_step", enrichment_node)
+    g.add_node("detection_step", detection_node)
     g.add_node("decide_step", decide_node)
     g.add_edge(START, "triage_step")
     g.add_edge("triage_step", "threat_intel_step")
     g.add_edge("threat_intel_step", "enrichment_step")
-    g.add_edge("enrichment_step", "decide_step")
+    g.add_edge("enrichment_step", "detection_step")
+    g.add_edge("detection_step", "decide_step")
     g.add_edge("decide_step", END)
     return g
 
@@ -100,12 +106,22 @@ async def run_investigation(
     if threat_intel_envelope:
         incident_row.threat_intel = threat_intel_envelope
 
-    # Persist the Enrichment envelope for potential future use
+    # Persist the Enrichment envelope (optional, for debugging/audit).
     enrichment_envelope = final_state.get("enrichment") or {}
     if enrichment_envelope:
-        # Note: In a full implementation, we might persist enrichment data
-        # to a separate table or as part of a extended incident model
+        # Not persisted to Incident by default; could be added to a separate
+        # table or to Incident if desired. For now we keep it in AgentState
+        # and traces only.
         pass
+
+    # Persist the Detection envelope.
+    detection_envelope = final_state.get("detection") or {}
+    if detection_envelope:
+        # Store detection fields on the Incident row.
+        incident_row.detection_score = detection_envelope.get("detection_score")
+        incident_row.attack_stage = detection_envelope.get("attack_stage")
+        incident_row.related_incident_ids = detection_envelope.get("related_incident_ids")
+        incident_row.detection_details = detection_envelope.get("detection_details")
 
     # Persist trace rows for the agents that ran (1 per node, plus the
     # terminal Decide which is the Supervisor stub).
@@ -192,17 +208,55 @@ async def run_investigation(
         )
         trace_ids.append(str(trace_id))
 
+    detection_output = final_state.get("detection") or {}
+    if detection_output:
+        # Build reasoning string for detection
+        reasoning_parts = []
+        if detection_output.get('detection_score') is not None:
+            reasoning_parts.append(f"Detection Score: {detection_output['detection_score']}")
+        if detection_output.get('attack_stage'):
+            reasoning_parts.append(f"Attack Stage: {detection_output['attack_stage']}")
+        if detection_output.get('reasoning'):
+            # reasoning is a list of strings; join first few
+            reason_list = detection_output['reasoning']
+            if isinstance(reason_list, list):
+                reasoning_parts.append(f"Details: {'; '.join(reason_list[:3])}")
+            else:
+                reasoning_parts.append(f"Details: {reason_list}")
+        if detection_output.get('related_incident_ids'):
+            rid = detection_output['related_incident_ids']
+            if isinstance(rid, list):
+                reasoning_parts.append(f"Related Incidents: {len(rid)}")
+        
+        reasoning = "; ".join(reasoning_parts) if reasoning_parts else "Detection completed"
+        
+        trace_id = await record_trace(
+            session,
+            incident_id=incident_uuid,
+            agent_name=AgentName.DETECTION,
+            step=4,
+            input_={
+                "enrichment": enrichment_output,
+                "threat_intel": threat_intel_envelope,
+            },
+            output=detection_output,
+            reasoning=reasoning,
+            started_at=0.0,
+        )
+        trace_ids.append(str(trace_id))
+
     # Decide is trivial but we record it too — Trace Viewer wants every step.
     decide_output = {"final_decision": final_state.get("final_decision")}
     trace_id = await record_trace(
         session,
         incident_id=incident_uuid,
         agent_name=AgentName.SUPERVISOR,  # decide is the supervisor stub
-        step=4,
+        step=5,
         input_={
             "triage": triage_output,
             "threat_intel": threat_intel_envelope,
             "enrichment": enrichment_output,
+            "detection": detection_output,
         },
         output=decide_output,
         reasoning=f"Routed to: {final_state.get('final_decision')}",
@@ -272,6 +326,10 @@ def _incident_to_dict(inc) -> dict:
         "raw_event": inc.raw_event,
         "rule_hits": list(getattr(inc, "rule_hits", []) or []),
         "threat_intel": getattr(inc, "threat_intel", None) or {},
+        "detection_score": getattr(inc, "detection_score", None),
+        "attack_stage": getattr(inc, "attack_stage", None),
+        "related_incident_ids": getattr(inc, "related_incident_ids", None),
+        "detection_details": getattr(inc, "detection_details", None),
         "created_at": inc.created_at.isoformat() if inc.created_at else None,
         "updated_at": inc.updated_at.isoformat() if inc.updated_at else None,
     }
