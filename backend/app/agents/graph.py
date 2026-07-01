@@ -1,11 +1,11 @@
 """LangGraph state graph for the HyperPlane investigation pipeline.
 
-Topology (Week 7):
+Topology (Week 8):
 
     START
       │
       ▼
-    triage_step ──▶ threat_intel_step ──▶ decide_step ──▶ END
+    triage_step ──▶ threat_intel_step ──▶ enrichment_step ──▶ decide_step ──▶ END
 
 Week 5 had just triage → decide. Week 6 inserts the Threat Intel agent in
 between, persisting its envelope as both:
@@ -20,8 +20,9 @@ state and bump the persisted Incident.severity if any rule (typically
 severity (computed before the agent graph populates `threat_intel`) is
 what the dashboard shows — even if TI then sees a score of 90.
 
-Weeks 8-10 will add Enrichment / Detection / Response between TI and decide
-and wrap the whole thing in an LLM-backed Supervisor.
+Week 8 adds the Enrichment agent between Threat Intel and Decide,
+adding contextual information like GeoIP, asset/user enrichment,
+MITRE ATT&CK mapping, and threat scoring.
 """
 from __future__ import annotations
 
@@ -32,6 +33,7 @@ from typing import Any
 from langgraph.graph import END, START, StateGraph
 
 from app.agents.state import AgentState
+from app.agents.enrichment_node import enrichment_node
 from app.agents.threat_intel_node import threat_intel_node
 from app.agents.tracing import record_trace
 from app.agents.triage import decide_node, triage_node
@@ -48,15 +50,17 @@ def build_graph() -> Any:
 
     Node names are distinct from state keys (LangGraph enforces this — node
     names become graph channels). We use `triage_step`, `threat_intel_step`,
-    and `decide_step`.
+    `enrichment_step`, and `decide_step`.
     """
     g = StateGraph(AgentState)
     g.add_node("triage_step", triage_node)
     g.add_node("threat_intel_step", threat_intel_node)
+    g.add_node("enrichment_step", enrichment_node)
     g.add_node("decide_step", decide_node)
     g.add_edge(START, "triage_step")
     g.add_edge("triage_step", "threat_intel_step")
-    g.add_edge("threat_intel_step", "decide_step")
+    g.add_edge("threat_intel_step", "enrichment_step")
+    g.add_edge("enrichment_step", "decide_step")
     g.add_edge("decide_step", END)
     return g
 
@@ -95,6 +99,13 @@ async def run_investigation(
     threat_intel_envelope = final_state.get("threat_intel") or {}
     if threat_intel_envelope:
         incident_row.threat_intel = threat_intel_envelope
+
+    # Persist the Enrichment envelope for potential future use
+    enrichment_envelope = final_state.get("enrichment") or {}
+    if enrichment_envelope:
+        # Note: In a full implementation, we might persist enrichment data
+        # to a separate table or as part of a extended incident model
+        pass
 
     # Persist trace rows for the agents that ran (1 per node, plus the
     # terminal Decide which is the Supervisor stub).
@@ -138,16 +149,60 @@ async def run_investigation(
         )
         trace_ids.append(str(trace_id))
 
+    enrichment_output = final_state.get("enrichment") or {}
+    if enrichment_output:
+        # Build reasoning string for enrichment
+        geo_info = enrichment_output.get('geo', {})
+        src_geo = geo_info.get('source') if isinstance(geo_info, dict) else None
+        dst_geo = geo_info.get('destination') if isinstance(geo_info, dict) else None
+        
+        geo_desc = []
+        if src_geo:
+            geo_desc.append(f"src:{src_geo.get('country', 'Unknown')}")
+        if dst_geo:
+            geo_desc.append(f"dst:{dst_geo.get('country', 'Unknown')}")
+        
+        mitre_tactics = enrichment_output.get('mitre_tactics', [])
+        mitre_techniques = enrichment_output.get('mitre_techniques', [])
+        
+        reasoning_parts = []
+        if geo_desc:
+            reasoning_parts.append(f"Geo: {', '.join(geo_desc)}")
+        if mitre_tactics:
+            reasoning_parts.append(f"MITRE Tactics: {', '.join(mitre_tactics[:3])}")
+        if mitre_techniques:
+            reasoning_parts.append(f"MITRE Tech: {', '.join(mitre_techniques[:3])}")
+        if enrichment_output.get('threat_score') is not None:
+            reasoning_parts.append(f"Threat Score: {enrichment_output['threat_score']}")
+        
+        reasoning = "; ".join(reasoning_parts) if reasoning_parts else "Enrichment completed"
+        
+        trace_id = await record_trace(
+            session,
+            incident_id=incident_uuid,
+            agent_name=AgentName.ENRICHMENT,
+            step=3,
+            input_={
+                "threat_intel": threat_intel_envelope,
+                "src_ip": (incident_dict.get("raw_event") or {}).get("src"),
+            },
+            output=enrichment_output,
+            reasoning=reasoning,
+            started_at=0.0,
+        )
+        trace_ids.append(str(trace_id))
+
     # Decide is trivial but we record it too — Trace Viewer wants every step.
     decide_output = {"final_decision": final_state.get("final_decision")}
     trace_id = await record_trace(
         session,
         incident_id=incident_uuid,
         agent_name=AgentName.SUPERVISOR,  # decide is the supervisor stub
-        step=3,
+        step=4,
         input_={
             "triage": triage_output,
             "threat_intel": threat_intel_envelope,
+            "enrichment": enrichment_output,
         },
         output=decide_output,
         reasoning=f"Routed to: {final_state.get('final_decision')}",

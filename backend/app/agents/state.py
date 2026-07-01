@@ -27,6 +27,10 @@ class AgentState(TypedDict, total=False):
     # Week 6 — ThreatIntelAgent output envelope (see app/threatintel/agent.py):
     #   {"ip", "score", "sources", "hits", "checked_at"}.
     threat_intel: dict
+    # Week 8 — EnrichmentAgent output envelope:
+    #   {"source_ip", "destination_ip", "geo", "asset_id", "user_id",
+    #    "mitre_tactics", "mitre_techniques", "threat_score", "indicators"}
+    enrichment: dict
     needs_investigation: bool
     summary: str            # one-line human summary for the dashboard
 
