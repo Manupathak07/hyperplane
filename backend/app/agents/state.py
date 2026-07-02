@@ -35,6 +35,10 @@ class AgentState(TypedDict, total=False):
     #   {"detection_score", "attack_stage", "reasoning",
     #    "related_incident_ids", "detection_details"}
     detection: dict
+    # Week 10 — ResponseAgent output envelope:
+    #   {"report": str, "recommended_actions": list[str],
+    #    "response_summary": str, "details": dict}
+    response: dict
     needs_investigation: bool
     summary: str            # one-line human summary for the dashboard
 

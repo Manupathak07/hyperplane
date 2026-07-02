@@ -36,8 +36,9 @@ from typing import Any
 from langgraph.graph import END, START, StateGraph
 
 from app.agents.state import AgentState
-from app.agents.detection_node import detection_node
-from app.agents.enrichment_node import enrichment_node
+from app.detection.node import detection_node
+from app.enrichment.node import enrichment_node
+from app.response.node import response_node
 from app.agents.threat_intel_node import threat_intel_node
 from app.agents.tracing import record_trace
 from app.agents.triage import decide_node, triage_node
@@ -61,12 +62,14 @@ def build_graph() -> Any:
     g.add_node("threat_intel_step", threat_intel_node)
     g.add_node("enrichment_step", enrichment_node)
     g.add_node("detection_step", detection_node)
+    g.add_node("response_step", response_node)
     g.add_node("decide_step", decide_node)
     g.add_edge(START, "triage_step")
     g.add_edge("triage_step", "threat_intel_step")
     g.add_edge("threat_intel_step", "enrichment_step")
     g.add_edge("enrichment_step", "detection_step")
-    g.add_edge("detection_step", "decide_step")
+    g.add_edge("detection_step", "response_step")
+    g.add_edge("response_step", "decide_step")
     g.add_edge("decide_step", END)
     return g
 
@@ -122,6 +125,12 @@ async def run_investigation(
         incident_row.attack_stage = detection_envelope.get("attack_stage")
         incident_row.related_incident_ids = detection_envelope.get("related_incident_ids")
         incident_row.detection_details = detection_envelope.get("detection_details")
+
+    # Persist the Response envelope.
+    response_envelope = final_state.get("response") or {}
+    if response_envelope:
+        # Store response fields on the Incident row.
+        incident_row.response = response_envelope
 
     # Persist trace rows for the agents that ran (1 per node, plus the
     # terminal Decide which is the Supervisor stub).
@@ -245,18 +254,47 @@ async def run_investigation(
         )
         trace_ids.append(str(trace_id))
 
+    # Response tracing
+    response_output = final_state.get("response") or {}
+    if response_output:
+        # Build reasoning string for response
+        reasoning_parts = []
+        if response_output.get('response_summary'):
+            reasoning_parts.append(f"Summary: {response_output['response_summary']}")
+        if response_output.get('recommended_actions'):
+            actions = response_output['recommended_actions']
+            if isinstance(actions, list):
+                reasoning_parts.append(f"Actions: {len(actions)} recommended")
+        reasoning = "; ".join(reasoning_parts) if response_output else "Response completed"
+
+        trace_id = await record_trace(
+            session,
+            incident_id=incident_uuid,
+            agent_name=AgentName.RESPONSE,
+            step=5,
+            input_={
+                "enrichment": enrichment_output,
+                "detection": detection_output,
+            },
+            output=response_output,
+            reasoning=reasoning,
+            started_at=0.0,
+        )
+        trace_ids.append(str(trace_id))
+
     # Decide is trivial but we record it too — Trace Viewer wants every step.
     decide_output = {"final_decision": final_state.get("final_decision")}
     trace_id = await record_trace(
         session,
         incident_id=incident_uuid,
         agent_name=AgentName.SUPERVISOR,  # decide is the supervisor stub
-        step=5,
+        step=6,
         input_={
             "triage": triage_output,
             "threat_intel": threat_intel_envelope,
             "enrichment": enrichment_output,
             "detection": detection_output,
+            "response": response_output,
         },
         output=decide_output,
         reasoning=f"Routed to: {final_state.get('final_decision')}",
@@ -330,6 +368,7 @@ def _incident_to_dict(inc) -> dict:
         "attack_stage": getattr(inc, "attack_stage", None),
         "related_incident_ids": getattr(inc, "related_incident_ids", None),
         "detection_details": getattr(inc, "detection_details", None),
+        "response": getattr(inc, "response", None) or {},
         "created_at": inc.created_at.isoformat() if inc.created_at else None,
         "updated_at": inc.updated_at.isoformat() if inc.updated_at else None,
     }

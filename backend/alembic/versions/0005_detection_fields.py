@@ -27,7 +27,7 @@ def upgrade() -> None:
     # attack_stage: string up to 64, nullable
     op.add_column('incidents', sa.Column('attack_stage', sa.String(length=64), nullable=True))
     # related_incident_ids: JSONB array of UUIDs, not null, default empty array
-    op.add_column('incidents', sa.Column('related_incident_ids', JSONB, nullable=False, server_default="'[]'::jsonb"))
+    op.add_column('incidents', sa.Column('related_incident_ids', JSONB, nullable=False, server_default='[]'))
     # detection_details: JSONB, nullable (could default to {} but keep nullable)
     op.add_column('incidents', sa.Column('detection_details', JSONB, nullable=True))
 
