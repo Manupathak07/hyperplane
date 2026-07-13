@@ -17,6 +17,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AgentName, AgentTrace, TraceStatus
+from app.websocket import manager
 
 
 async def record_trace(
@@ -45,4 +46,23 @@ async def record_trace(
     )
     session.add(trace)
     await session.flush()
+    
+    # Broadcast the new trace to WebSocket clients subscribed to this incident
+    await manager.broadcast_trace(
+        str(incident_id),
+        {
+            "trace": {
+                "id": str(trace.id),
+                "agent_name": trace.agent_name,  # Already a string due to str, enum inheritance
+                "step": trace.step,
+                "input": trace.input,
+                "output": trace.output,
+                "reasoning": trace.reasoning,
+                "duration_ms": trace.duration_ms,
+                "status": trace.status,  # Already a string due to str, enum inheritance
+                "created_at": trace.created_at.isoformat() if trace.created_at else None,
+            }
+        }
+    )
+    
     return trace.id

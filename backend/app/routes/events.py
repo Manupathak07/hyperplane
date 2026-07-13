@@ -25,6 +25,7 @@ from app.ingestion.normalizer import NormalisedEvent, severity_to_enum
 from app.models import Incident, IncidentStatus, Severity
 from app.rules import EvalContext, evaluate, recompute_severity, severity_enum_for
 from app.search.indexer import index_incident
+from app.websocket import manager
 
 router = APIRouter(prefix="/events", tags=["ingest"])
 
@@ -153,6 +154,8 @@ async def _insert_one(session: AsyncSession, event: NormalisedEvent) -> EventRes
     fresh_row = fresh.scalar_one_or_none()
     if fresh_row is not None:
         await index_incident(fresh_row)
+        # Broadcast new event to WebSocket clients
+        await manager.broadcast_event(fresh_row)
     return EventResult(event_id=event.event_id, status="created", id=row)
 
 
