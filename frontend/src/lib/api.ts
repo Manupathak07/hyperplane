@@ -173,6 +173,14 @@ export function useTraceStream(
 
 // --- API client functions (unchanged) -------------------------------------
 
+export const api = {
+  get: <T>(url: string) => apiGet<T>(url),
+  post: <T, D = unknown>(url: string, data: D) => apiPost<T, D>(url, data),
+  put: <T, D = unknown>(url: string, data: D) => apiPut<T, D>(url, data),
+  patch: <T, D = unknown>(url: string, data: D) => apiPatch<T, D>(url, data),
+  delete: <T>(url: string) => apiDelete<T>(url),
+};
+
 async function apiFetch<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${typeof input === "string" ? input : ""}`, {
     ...(init ?? {}),
